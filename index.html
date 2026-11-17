@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>25 + 5 Clock</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.development.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.development.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.5/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useReducer, useEffect, useRef } = React;
+
+      const BEEP_URL = "https://cdn.freecodecamp.org/testable-projects-fcc/audio/BeepSound.wav";
+
+      const INITIAL = {
+        breakLength: 5,
+        sessionLength: 25,
+        mode: "Session",
+        timeLeft: 25 * 60,
+        running: false,
+        celebrate: 0, 
+        resetCount: 0,
+      };
+
+      function reducer(s, action) {
+        switch (action.type) {
+          case "break": {
+            const v = s.breakLength + action.amount;
+            if (v < 1 || v > 60) return s;
+            const idle = !s.running && s.mode === "Break";
+            return { ...s, breakLength: v, timeLeft: idle ? v * 60 : s.timeLeft };
+          }
+          case "session": {
+            const v = s.sessionLength + action.amount;
+            if (v < 1 || v > 60) return s;
+            const idle = !s.running && s.mode === "Session";
+            return { ...s, sessionLength: v, timeLeft: idle ? v * 60 : s.timeLeft };
+          }
+          case "toggle":
+            return { ...s, running: !s.running };
+          case "tick": {
+            if (!s.running) return s;
+            const celebrate = Math.max(s.celebrate - 1, 0);
+            if (s.timeLeft > 0) {
+              const timeLeft = s.timeLeft - 1;
+              return { ...s, timeLeft, celebrate: timeLeft === 0 ? 5 : celebrate };
+            }
+            const mode = s.mode === "Session" ? "Break" : "Session";
+            const length = mode === "Session" ? s.sessionLength : s.breakLength;
+            return { ...s, mode, timeLeft: length * 60, celebrate };
+          }
+          case "reset":
+            return { ...INITIAL, resetCount: s.resetCount + 1 };
+          default:
+            return s;
+        }
+      }
+
+      function formatTime(totalSeconds) {
+        const m = Math.floor(totalSeconds / 60);
+        const s = totalSeconds % 60;
+        return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+      }
+
+      function App() {
+        const [state, dispatch] = useReducer(reducer, INITIAL);
+        const beepRef = useRef(null);
+
+        useEffect(() => {
+          if (!state.running) return;
+          const id = setInterval(() => dispatch({ type: "tick" }), 1000);
+          return () => clearInterval(id);
+        }, [state.running]);
+
+        useEffect(() => {
+          if (state.timeLeft === 0) {
+            beepRef.current.play().catch(() => {});
+          }
+        }, [state.timeLeft]);
+
+        useEffect(() => {
+          beepRef.current.pause();
+          beepRef.current.currentTime = 0;
+        }, [state.resetCount]);
+
+        function reset() {
+          dispatch({ type: "reset" });
+          beepRef.current.pause();
+          beepRef.current.currentTime = 0;
+        }
+
+        return (
+          <div id="clock">
+            <h1>25 + 5 Clock</h1>
+
+            <div className="settings">
+              <div className="setting">
+                <div id="break-label">Break Length</div>
+                <div className="controls">
+                  <button id="break-decrement" onClick={() => dispatch({ type: "break", amount: -1 })}>−</button>
+                  <span id="break-length">{state.breakLength}</span>
+                  <button id="break-increment" onClick={() => dispatch({ type: "break", amount: 1 })}>+</button>
+                </div>
+              </div>
+
+              <div className="setting">
+                <div id="session-label">Session Length</div>
+                <div className="controls">
+                  <button id="session-decrement" onClick={() => dispatch({ type: "session", amount: -1 })}>−</button>
+                  <span id="session-length">{state.sessionLength}</span>
+                  <button id="session-increment" onClick={() => dispatch({ type: "session", amount: 1 })}>+</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="timer">
+              <div id="timer-label">{state.mode}</div>
+              <div id="time-left">{formatTime(state.timeLeft)}</div>
+            </div>
+
+            {state.celebrate > 0 && (
+              <div id="celebration">😛 congratulations! that was funny.</div>
+            )}
+
+            <div className="actions">
+              <button id="start_stop" onClick={() => dispatch({ type: "toggle" })}>
+                {state.running ? "Pause" : "Start"}
+              </button>
+              <button id="reset" onClick={reset}>Reset</button>
+            </div>
+
+            <audio id="beep" ref={beepRef} src={BEEP_URL} preload="auto"></audio>
+          </div>
+        );
+      }
+
+      ReactDOM.render(<App />, document.getElementById("root"));
+    </script>
+
+    <script src="https://cdn.freecodecamp.org/testable-projects-fcc/v1/bundle.js"></script>
+  </body>
+</html>
